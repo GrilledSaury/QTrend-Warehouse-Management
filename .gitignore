@@ -11,3 +11,8 @@ vite.config.ts.timestamp-*
 
 package-lock.json
 pnpm-lock.yaml
+
+# Firebase admin keys
+service-account*.json
+*-firebase-adminsdk-*.json
+.firebase/

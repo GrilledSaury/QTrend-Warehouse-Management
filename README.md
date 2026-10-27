@@ -1,30 +1,51 @@
-# template-svelte
+# QTrend Warehouse Management
 
-Vite + Svelte + SvelteKit + TailwindCSS + [AceUI](https://ace-ui.pages.dev)
+Tracks which products are in which warehouse positions. Staff sign in with Google and add, take or move items; every change is logged.
 
-## Get Started
+SvelteKit (static SPA) + Tailwind + Firebase (Hosting, Auth, Firestore). No backend.
 
-Click **Use Template** or this [link](https://github.com/yzITI/template-svelte/generate).
+## Data model (Firestore)
 
-Change project name in  `package.json`
-```
-"name": "project-name"
-```
+| Collection | Doc ID | Fields |
+|---|---|---|
+| `products` | SKU, e.g. `ABC-123` | `name`, `createdAt`, `createdBy` |
+| `positions` | code, e.g. `A-01-03` | `note`, `createdAt`, `createdBy` |
+| `stock` | `{positionId}__{productId}` | `positionId`, `productId`, `qty` (> 0), `updatedAt`, `updatedBy` |
+| `hand` | `{uid}__{productId}` | items a user picked off a shelf and is carrying: `uid`, `email`, `by`, `productId`, `qty` |
+| `movements` | auto | `kind` (`to-hand` / `from-hand` / `remove` / `correct`), `positionId`, `productId`, `delta`, `qtyAfter`, `uid`, `email`, `by`, `at` |
+| `allowedUsers` | user's email | *(anything; the doc just has to exist)* |
 
-Change page title in `src/routes/layout.svelte`
+A product can be in many positions and a position can hold many products. Each add/take/move runs as one transaction that updates `stock` and appends to `movements`, so stock never goes negative and the log always matches. A `stock` doc is deleted when its qty reaches 0.
 
-```html
-<title>Your Page Title</title>
-```
+Security rules (`firestore.rules`): any user listed in `allowedUsers` can read and write all app data; `allowedUsers` itself is managed only from the Firebase console.
 
-Install dependency
+## Firebase setup (one time)
+
+1. Create a project at <https://console.firebase.google.com>.
+2. **Authentication** → Sign-in method → enable **Google**.
+3. **Firestore Database** → create a database (production mode).
+4. **Project settings** → Your apps → add a **Web app**, then copy its config into `.env` (see `.env.example`).
+5. Install/update the CLI and link the project:
+   ```
+   npm i -g firebase-tools@latest
+   firebase login
+   firebase use --add
+   ```
+6. Deploy rules and indexes: `firebase deploy --only firestore`
+7. Authorize users: in Firestore, create collection `allowedUsers` with one document per person, document ID = their Google email (e.g. `jane@example.com`).
+
+## Develop
 
 ```
 npm i
-```
-
-Run dev server
-
-```
 npm run dev
 ```
+
+## Deploy
+
+```
+npm run build
+firebase deploy --only hosting
+```
+
+Add your hosting domain (e.g. `your-project.web.app`) under Authentication → Settings → Authorized domains if it's not there already.

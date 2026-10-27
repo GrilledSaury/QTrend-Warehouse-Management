@@ -5,3 +5,12 @@
     @slot;
   }
 }
+
+@utility card { @apply rounded-lg border border-gray-200 bg-white p-4 shadow-sm; }
+@utility input { @apply rounded border border-gray-300 bg-white px-2 py-1.5 outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500; }
+@utility btn { @apply cursor-pointer rounded px-3 py-1.5 font-medium disabled:cursor-not-allowed disabled:opacity-50; }
+@utility btn-primary { @apply btn bg-blue-600 text-white hover:bg-blue-700; }
+@utility btn-add { @apply btn bg-green-600 text-white hover:bg-green-700; }
+@utility btn-take { @apply btn bg-red-600 text-white hover:bg-red-700; }
+@utility btn-ghost { @apply btn text-gray-700 hover:bg-gray-100; }
+@utility error { @apply text-sm text-red-600; }

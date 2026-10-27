@@ -1,0 +1,25 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // Only Google accounts listed in /allowedUsers/{email} can use the app.
+    // Add users in the Firebase console: collection "allowedUsers", document ID = their email.
+    function signedIn() {
+      return request.auth != null && request.auth.token.email_verified == true;
+    }
+    function allowed() {
+      return signedIn()
+        && exists(/databases/$(database)/documents/allowedUsers/$(request.auth.token.email));
+    }
+
+    match /allowedUsers/{email} {
+      // Users may check their own entry; managing the list is console-only.
+      allow get: if signedIn() && request.auth.token.email == email;
+    }
+
+    // Authorized users have full access to all app data.
+    match /{collection}/{id} {
+      allow read, write: if allowed() && collection != 'allowedUsers';
+    }
+  }
+}
