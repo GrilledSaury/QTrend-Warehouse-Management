@@ -15,7 +15,9 @@ SvelteKit (static SPA) + Tailwind + Firebase (Hosting, Auth, Firestore). No back
 | `movements` | auto | `kind` (`to-hand` / `from-hand` / `remove` / `correct`), `positionId`, `productId`, `delta`, `qtyAfter`, `uid`, `email`, `by`, `at` |
 | `allowedUsers` | user's email | *(anything; the doc just has to exist)* |
 
-A product can be in many positions and a position can hold many products. Each add/take/move runs as one transaction that updates `stock` and appends to `movements`, so stock never goes negative and the log always matches. A `stock` doc is deleted when its qty reaches 0.
+A product can be in many positions and a position can hold many products. Each add/take/move runs as one transaction that updates `stock` and appends to `movements`, so stock never goes negative and the log always matches.
+
+**Delta sync:** the app keeps a copy of positions/products/stock in localStorage and on reload only fetches docs whose `updatedAt` is newer. So every write to those collections must set `updatedAt` (server timestamp), and `stock` docs are set to `qty: 0` instead of deleted. After deleting docs any other way (e.g. `import-firestore.mjs --clear`), set `meta/sync.resetAt` to now so devices do a full reload.
 
 Security rules (`firestore.rules`): any user listed in `allowedUsers` can read and write all app data; `allowedUsers` itself is managed only from the Firebase console.
 

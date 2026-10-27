@@ -28,9 +28,9 @@ function stockTx (fn) {
       const snap = await tx.get(ref)
       return snap.exists() ? snap.data().qty : 0
     }
+    // Empty stock is kept at qty 0, not deleted, so other devices' delta sync sees the change.
     const writeStock = (positionId, productId, qty) => {
-      if (qty === 0) tx.delete(stockRef(positionId, productId))
-      else tx.set(stockRef(positionId, productId), {
+      tx.set(stockRef(positionId, productId), {
         positionId, productId, qty, updatedAt: serverTimestamp(), updatedBy: user.email
       })
     }
@@ -55,7 +55,7 @@ export async function createPosition (code, note = '') {
   const ref = doc(db, 'positions', id)
   await runTransaction(db, async tx => {
     if ((await tx.get(ref)).exists()) throw new Error(`Position ${id} already exists`)
-    tx.set(ref, { note: String(note).trim(), createdAt: serverTimestamp(), createdBy: auth.currentUser.email })
+    tx.set(ref, { note: String(note).trim(), createdAt: serverTimestamp(), createdBy: auth.currentUser.email, updatedAt: serverTimestamp() })
   })
   return id
 }
@@ -107,7 +107,7 @@ export function setStock (positionId, productId, qty) {
     const current = await read(stockRef(positionId, productId))
     if (qty === current) return
     if (!productExists) {
-      tx.set(productRef, { name: productId.replace(/-/g, ' '), createdAt: serverTimestamp(), createdBy: user.email })
+      tx.set(productRef, { name: productId.replace(/-/g, ' '), createdAt: serverTimestamp(), createdBy: user.email, updatedAt: serverTimestamp() })
     }
     writeStock(positionId, productId, qty)
     log('correct', positionId, productId, qty - current, qty)

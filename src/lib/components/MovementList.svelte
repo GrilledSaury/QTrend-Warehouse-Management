@@ -1,27 +1,37 @@
 <script>
-  import { collection, limit, onSnapshot, orderBy, query, where } from 'firebase/firestore'
+  import { collection, limit, onSnapshot, orderBy, query, Timestamp, where } from 'firebase/firestore'
   import { db } from '$lib/firebase'
   import { inventory } from '$lib/inventory.svelte'
 
-  // Optionally filter by positionId or productId.
-  let { positionId = null, productId = null, max = 50 } = $props()
+  let { max = 200 } = $props()
 
   let movements = $state.raw([])
   let error = $state('')
   let now = $state(Date.now())
 
   $effect(() => {
-    const filters = []
-    if (positionId) filters.push(where('positionId', '==', positionId))
-    if (productId) filters.push(where('productId', '==', productId))
-    const q = query(collection(db, 'movements'), ...filters, orderBy('at', 'desc'), limit(max))
+    const newest = cached[0]?.at
+    // >= so a movement sharing the newest timestamp is never missed; duplicates merge by id.
+    const q = newest
+      ? query(collection(db, 'movements'), where('at', '>=', Timestamp.fromMillis(newest)), orderBy('at', 'desc'), limit(max))
+      : query(collection(db, 'movements'), orderBy('at', 'desc'), limit(max))
     return onSnapshot(q, s => {
-      movements = s.docs.map(d => ({ id: d.id, ...d.data() }))
+      const byId = new Map(movements.map(m => [m.id, m]))
+      for (const { type, doc } of s.docChanges()) {
+        if (type === 'removed') continue // fell out of the limit window, not deleted
+        const d = doc.data({ serverTimestamps: 'estimate' })
+        byId.set(doc.id, {
+          id: doc.id, kind: d.kind, positionId: d.positionId, productId: d.productId,
+          delta: d.delta, qtyAfter: d.qtyAfter, by: d.by, at: d.at?.toMillis() ?? Date.now()
+        })
+      }
+      movements = [...byId.values()].sort((a, b) => b.at - a.at).slice(0, max)
+      saveCache(movements)
       error = ''
     }, e => { error = e.message })
   })
 
-  // Tick so relative times stay current.
+  // Tick so relative times stay current (display only, no reads).
   $effect(() => {
     const timer = setInterval(() => (now = Date.now()), 30_000)
     return () => clearInterval(timer)
@@ -29,11 +39,9 @@
 
   const RECENT_MS = 2 * 60 * 60 * 1000
 
-  function when (ts) {
-    if (!ts) return 'just now'
-    const date = ts.toDate()
-    const ago = now - date.getTime()
-    if (ago >= RECENT_MS) return date.toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
+  function when (at) {
+    const ago = now - at
+    if (ago >= RECENT_MS) return new Date(at).toLocaleString(undefined, { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' })
     const mins = Math.max(Math.floor(ago / 60_000), 0)
     if (mins < 1) return 'just now'
     const h = Math.floor(mins / 60)
